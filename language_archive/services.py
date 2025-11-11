@@ -128,7 +128,7 @@ def create_archive_map(geographic_records, speakers):
         if record.youtube_url:
             # YouTube動画の場合 
             popup_html = f"""
-            <div style="min-width: 250px;">
+            <div style="min-width: 200px;">
                 <h5 style="margin-bottom: 10px;">
                     <i class="fab fa-youtube" style="color: red;"></i> {record.title}
                 </h5>
@@ -137,9 +137,6 @@ def create_archive_map(geographic_records, speakers):
                 </p>
                 <p style="font-size: 0.9em; margin-bottom: 15px;">
                     <strong>説明:</strong> {record.description[:100]}{'...' if len(record.description) > 100 else ''}
-                </p>
-                <p style="font-size: 0.85em; color: #666; margin-bottom: 10px;">
-                    <i class="fas fa-info-circle"></i> YouTubeで動画を視聴できます
                 </p>
                 <a href="{record.youtube_url}" 
                    target="_blank" 

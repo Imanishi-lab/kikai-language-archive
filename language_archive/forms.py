@@ -16,10 +16,9 @@ class LanguageRecordForm(forms.ModelForm):
         self.fields['file_type'].choices = file_type_choices
         self.fields['file_type'].widget.attrs['required'] = True
 
-        #language_frequency (必須)
-        freq_choices = [("", "言語使用頻度を選択")] + list(LanguageRecord.FREQUENCY_CHOICES)
-        self.fields['language_frequency'].choices = freq_choices
-        self.fields['language_frequency'].widget.attrs['required'] = True
+        #language_frequency (未選択を選択肢に追加)
+        self.fields['language_frequency'].choices = LanguageRecord.FREQUENCY_CHOICES
+        self.fields['language_frequency'].required = False
 
         # speaker (モデルでは任意だが、フォームでは必須)
         self.fields['speaker'].required = True
@@ -36,12 +35,6 @@ class LanguageRecordForm(forms.ModelForm):
         data = self.cleaned_data.get('file_type')
         if not data:
             raise forms.ValidationError("ファイルを選択してください。")
-        return data
-
-    def clean_language_frequency(self):
-        data = self.cleaned_data.get('language_frequency')
-        if not data:
-            raise forms.ValidationError("言語使用頻度を選択してください。")
         return data
 
     class Meta:

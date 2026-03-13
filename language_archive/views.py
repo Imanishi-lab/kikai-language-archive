@@ -1,18 +1,22 @@
 # language_archive/views.py
 
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpResponse, StreamingHttpResponse
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages
 from django.db.models.functions import TruncYear
-from django.db.models import Count, Q
 from .models import LanguageRecord, GeographicRecord, Village, OnomatopoeiaType, Speaker
 from .forms import LanguageRecordForm, GeographicRecordForm
 from .services import upload_to_supabase, get_bucket_name, create_archive_map
-from .utils import reverse_geocode
-import requests
-import urllib.parse
-import os
-import datetime
+
+# 一覧ページの1ページあたりの件数
+PAGINATE_BY = 6
+
+
+def _pagination_query(request):
+    """ページネーション用のGETパラメータ（pageを除く）を返す"""
+    q = request.GET.copy()
+    q.pop('page', None)
+    return q.urlencode()
 
 def index(request):
     """トップページ"""
@@ -73,26 +77,47 @@ def upload_language_record(request):
         
         if form.is_valid():
             file = request.FILES.get('file')
+            youtube_url = form.cleaned_data.get('youtube_url')
             
-            if file:
-                try:
-                    record = form.save(commit=False)
-                    
+            try:
+                record = form.save(commit=False)
+                
+                # YouTube URLが入力されている場合
+                if youtube_url:
+                    record.youtube_url = youtube_url
+                    record.file_path = None
+                    record.title = (form.cleaned_data.get('title') or '').strip() or None
+                    record.description = (form.cleaned_data.get('description') or '').strip() or None
+                    record.onomatopoeia_text = None
+                    record.meaning = None
+                    record.usage_example = None
+                    record.phonetic_notation = None
+                    record.language_frequency = None
+                    record.onomatopoeia_type = None
+                    messages.success(request, '言語記録をYouTube URLで登録しました。')
+                
+                # ファイルがアップロードされている場合
+                elif file:
                     # Supabaseにアップロード
                     file_type = form.cleaned_data['file_type']
                     bucket_name = get_bucket_name(file_type)
                     public_url = upload_to_supabase(file, bucket_name, f"language/{file_type}/")
                     
                     record.file_path = public_url
-                    record.save()
-                    form.save_m2m() # ManyToManyフィールドがあれば保存
-                    
+                    record.youtube_url = None  # YouTube URLをクリア
                     messages.success(request, '言語記録をアップロードしました。')
-                    return redirect('record_list')
-                except Exception as e:
-                    messages.error(request, f'アップロードエラー: {str(e)}')
-            else:
-                messages.error(request, 'ファイルを選択してください。')
+                
+                record.save()
+                form.save_m2m() # ManyToManyフィールドがあれば保存
+                return redirect('record_list')
+                
+            except Exception as e:
+                messages.error(request, f'エラー: {str(e)}')
+        else:
+            # フォームエラーを表示
+            for _, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{error}')
     else:
         form = LanguageRecordForm()
     
@@ -150,7 +175,7 @@ def upload_geographic_record(request):
                 messages.error(request, f'エラー: {str(e)}')
         else:
             # フォームエラーを表示
-            for field, errors in form.errors.items():
+            for _, errors in form.errors.items():
                 for error in errors:
                     messages.error(request, f'{error}')
     else:
@@ -183,9 +208,23 @@ def record_list(request):
     villages = Village.objects.filter(id__in=village_ids_with_records).order_by('-name')
 
     onomatopoeia_types = OnomatopoeiaType.objects.all()
+
+    paginator = Paginator(records, PAGINATE_BY)
+    page_obj = None
+    if paginator.count > 0:
+        page = request.GET.get('page', 1)
+        try:
+            page_obj = paginator.page(page)
+        except PageNotAnInteger:
+            page_obj = paginator.page(1)
+        except EmptyPage:
+            page_obj = paginator.page(paginator.num_pages)
     
     context = {
-        'records': records,
+        'records': page_obj.object_list if page_obj else [],
+        'page_obj': page_obj,
+        'paginator': paginator,
+        'pagination_query': _pagination_query(request),
         'villages': villages,
         'onomatopoeia_types': onomatopoeia_types,
     }
@@ -218,9 +257,23 @@ def geographic_list(request):
     
     village_ids_with_records = GeographicRecord.objects.filter(village__isnull=False).values_list('village_id', flat=True).distinct()
     villages = Village.objects.filter(id__in=village_ids_with_records).order_by('-name')
+
+    paginator = Paginator(geo_records, PAGINATE_BY)
+    page_obj = None
+    if paginator.count > 0:
+        page = request.GET.get('page', 1)
+        try:
+            page_obj = paginator.page(page)
+        except PageNotAnInteger:
+            page_obj = paginator.page(1)
+        except EmptyPage:
+            page_obj = paginator.page(paginator.num_pages)
     
     context = {
-        'geo_records': geo_records,
+        'geo_records': page_obj.object_list if page_obj else [],
+        'page_obj': page_obj,
+        'paginator': paginator,
+        'pagination_query': _pagination_query(request),
         'villages': villages,
     }
     return render(request, 'language_archive/geographic_list.html', context)
@@ -231,11 +284,25 @@ def village_records(request, village_id):
     village = get_object_or_404(Village, id=village_id)
     records = LanguageRecord.objects.filter(speaker__village=village).select_related(
         'speaker', 'onomatopoeia_type'
-    )
+    ).order_by('-recorded_date')
+
+    paginator = Paginator(records, PAGINATE_BY)
+    page_obj = None
+    if paginator.count > 0:
+        page = request.GET.get('page', 1)
+        try:
+            page_obj = paginator.page(page)
+        except PageNotAnInteger:
+            page_obj = paginator.page(1)
+        except EmptyPage:
+            page_obj = paginator.page(paginator.num_pages)
     
     context = {
         'village': village,
-        'records': records,
+        'records': page_obj.object_list if page_obj else [],
+        'page_obj': page_obj,
+        'paginator': paginator,
+        'pagination_query': _pagination_query(request),
     }
     return render(request, 'language_archive/village_records.html', context)
 
@@ -244,11 +311,25 @@ def speaker_records(request, speaker_id):
     speaker = get_object_or_404(Speaker, id=speaker_id)
     records = LanguageRecord.objects.filter(speaker=speaker).select_related(
         'onomatopoeia_type'
-    )
+    ).order_by('-recorded_date')
+
+    paginator = Paginator(records, PAGINATE_BY)
+    page_obj = None
+    if paginator.count > 0:
+        page = request.GET.get('page', 1)
+        try:
+            page_obj = paginator.page(page)
+        except PageNotAnInteger:
+            page_obj = paginator.page(1)
+        except EmptyPage:
+            page_obj = paginator.page(paginator.num_pages)
     
     context = {
         'speaker': speaker,
-        'records': records,
+        'records': page_obj.object_list if page_obj else [],
+        'page_obj': page_obj,
+        'paginator': paginator,
+        'pagination_query': _pagination_query(request),
     }
     return render(request, 'language_archive/speaker_records.html', context)
 

@@ -27,43 +27,46 @@ class OnomatopoeiaTypeAdmin(admin.ModelAdmin):
 
 @admin.register(LanguageRecord)
 class LanguageRecordAdmin(admin.ModelAdmin):
-    list_display = ['onomatopoeia_text', 'file_type', 'village', 'speaker', 'language_frequency','recorded_date']
-    list_filter = ['file_type', 'speaker__village', 'recorded_date', 'onomatopoeia_type','language_frequency']
-    search_fields = ['onomatopoeia_text', 'meaning']
+    list_display = ['get_display_title', 'file_type', 'village', 'speaker', 'language_frequency', 'recorded_date']
+    list_filter = ['file_type', 'speaker__village', 'recorded_date', 'onomatopoeia_type', 'language_frequency']
+    search_fields = ['onomatopoeia_text', 'meaning', 'title', 'description']
     date_hierarchy = 'recorded_date'
     list_per_page = 20
     readonly_fields = ['created_at', 'updated_at']
 
     autocomplete_fields = ['speaker', 'village', 'onomatopoeia_type']
+
+    def get_display_title(self, obj):
+        return obj.display_title or '-'
+    get_display_title.short_description = 'タイトル / オノマトペ'
     
     FIELDSETS_BASE = (
         ('基本情報', {
             'fields': ('onomatopoeia_text', 'meaning', 'usage_example', 'phonetic_notation', 'language_frequency')
         }),
         ('ファイル情報', {
-            'fields': ('file_type', 'file_path', 'thumbnail_path')
+            'fields': ('file_type', 'file_path', 'thumbnail_path', 'youtube_url')
         }),
         ('関連情報', {
-            'fields': ('speaker', 'onomatopoeia_type')
+            'fields': ('speaker', 'onomatopoeia_type', 'village')
         }),
         ('メタデータ', {
-            'fields': ('recorded_date', 'notes', 'created_at', 'updated_at')
+            'fields': ('title', 'description', 'recorded_date', 'notes', 'created_at', 'updated_at')
         }),
     )
     
-    # アップロードフォーム用のフィールドセット（villageフィールド非表示）
     FIELDSETS_ADD = (
         ('基本情報', {
             'fields': ('onomatopoeia_text', 'meaning', 'usage_example', 'phonetic_notation', 'language_frequency')
         }),
         ('ファイル情報', {
-            'fields': ('file_type', 'file_path', 'thumbnail_path')
+            'fields': ('file_type', 'file_path', 'thumbnail_path', 'youtube_url')
         }),
         ('関連情報', {
-            'fields': ('speaker', 'onomatopoeia_type')  
+            'fields': ('speaker', 'onomatopoeia_type')
         }),
         ('メタデータ', {
-            'fields': ('recorded_date', 'notes') 
+            'fields': ('title', 'description', 'recorded_date', 'notes')
         }),
     )
 

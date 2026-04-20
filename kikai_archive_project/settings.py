@@ -80,9 +80,9 @@ if DATABASE_URL:
             'default': dj_database_url.parse(DATABASE_URL)
         }
 #        DATABASES['default']['ENGINE'] = 'django_pg8000'
-        print(f"✅ Using Supabase PostgreSQL")
+        print("Using Supabase PostgreSQL")
     except ImportError:
-        print("❌ dj_database_url not found")
+        print("dj_database_url not found")
         DATABASES = {
             'default': {
                 'ENGINE': 'django.db.backends.sqlite3',

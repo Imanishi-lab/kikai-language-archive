@@ -46,6 +46,10 @@ urlpatterns = [
     
     # 話者関連
     path('speaker/<int:speaker_id>/records/', views.speaker_records, name='speaker_records'),
+
+    # アップロード認証
+    path('upload/login/', views.upload_login, name='upload_login'),
+    path('upload/logout/', views.upload_logout, name='upload_logout'),
 ]
 # 開発環境でのメディアファイル配信
 if settings.DEBUG:

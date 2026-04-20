@@ -3,3 +3,7 @@ venv/
 .env
 __pycache__/
 *.pyc
+
+# 生成物・ローカルDB
+staticfiles/
+db.sqlite3

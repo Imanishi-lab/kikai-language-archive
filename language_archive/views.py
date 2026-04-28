@@ -4,9 +4,43 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages
 from django.db.models.functions import TruncYear
+from functools import wraps
 from .models import LanguageRecord, GeographicRecord, Village, OnomatopoeiaType, Speaker
 from .forms import LanguageRecordForm, GeographicRecordForm
 from .services import upload_to_supabase, get_bucket_name, create_archive_map
+
+UPLOAD_USERNAME = 'Kikai'
+UPLOAD_PASSWORD = 'Language26'
+
+
+def upload_login_required(view_func):
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.session.get('upload_authenticated'):
+            return redirect(f'/upload/login/?next={request.path}')
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+def upload_login(request):
+    next_url = request.GET.get('next', '/records/upload/')
+    if request.session.get('upload_authenticated'):
+        return redirect(next_url)
+    error = None
+    if request.method == 'POST':
+        username = request.POST.get('username', '')
+        password = request.POST.get('password', '')
+        next_url = request.POST.get('next', next_url)
+        if username == UPLOAD_USERNAME and password == UPLOAD_PASSWORD:
+            request.session['upload_authenticated'] = True
+            return redirect(next_url)
+        error = 'IDまたはパスワードが正しくありません。'
+    return render(request, 'language_archive/upload_login.html', {'error': error, 'next': next_url})
+
+
+def upload_logout(request):
+    request.session.pop('upload_authenticated', None)
+    return redirect('index')
 
 # 一覧ページの1ページあたりの件数
 PAGINATE_BY = 6
@@ -70,6 +104,7 @@ def map_view(request):
     }
     return render(request, 'language_archive/map.html', context)
 
+@upload_login_required
 def upload_language_record(request):
     """言語記録のアップロード"""
     if request.method == 'POST':
@@ -127,6 +162,7 @@ def upload_language_record(request):
     return render(request, 'language_archive/upload_language.html', context)
 
 
+@upload_login_required
 def upload_geographic_record(request):
     """地理環境データのアップロード"""
     if request.method == 'POST':

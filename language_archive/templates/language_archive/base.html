@@ -253,6 +253,12 @@
                             <li><a class="dropdown-item" href="{% url 'upload_geographic_record' %}">
                                     地理データ
                                 </a></li>
+                            {% if request.session.upload_authenticated %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="{% url 'upload_logout' %}">
+                                    <i class="fas fa-sign-out-alt me-1"></i>ログアウト
+                                </a></li>
+                            {% endif %}
                         </ul>
                     </li>
                 </ul>
